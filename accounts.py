@@ -31,8 +31,3 @@ def withdraw(account: dict, amount: float):
     return account
 
 
-if __name__ == "__main__":
-    acc = create_account("ACC1001", 1000.0)
-    acc = deposit(acc, 500.0)
-    acc = withdraw(acc, 300.0)
-    print(acc)
