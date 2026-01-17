@@ -23,6 +23,7 @@ def init_db():
     conn.close()
 
     init_logs()
+    init_idempotency()
 
 def init_logs():
     conn = get_connection()
@@ -36,6 +37,22 @@ def init_logs():
             amount REAL NOT NULL,
             balance_after REAL NOT NULL,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
+def init_idempotency():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS idempotency_keys (
+            key TEXT PRIMARY KEY,
+            account_id TEXT NOT NULL,
+            action TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
