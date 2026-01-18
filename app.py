@@ -1,7 +1,13 @@
-from fastapi import FastAPI, HTTPException, Header
-from typing import Optional
+from fastapi import FastAPI
 from fastapi.security import APIKeyHeader
 from fastapi import Security
+from models.errors import (
+    unauthorized,
+    forbidden,
+    not_found,
+    conflict,
+    bad_request
+)
 
 from services.account_service import (
     create_account_service,
@@ -42,7 +48,7 @@ api_key_header = APIKeyHeader(name="x-api-key", auto_error=False)
 def authenticate(api_key: str):
     role = API_KEY_ROLES.get(api_key)
     if not role:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+        unauthorized()
     return role
 
 def authorize(role: str, action: str):
@@ -51,13 +57,8 @@ def authorize(role: str, action: str):
         "admin": {"deposit", "withdraw"}
     }
 
-    allowed_actions = permissions.get(role, set())
-
-    if action not in allowed_actions:
-        raise HTTPException(
-            status_code=403,
-            detail="Forbidden: insufficient permissions"
-        )
+    if action not in permissions.get(role, set()):
+        forbidden(action)
 
 @app.on_event("startup")
 def startup():
@@ -74,14 +75,17 @@ def create_new_account(
 ):
     authenticate(api_key)
 
-    account = create_account_service(
-        payload.account_id,
-        payload.initial_balance
-    )
+    try:
+        account = create_account_service(
+            payload.account_id,
+            payload.initial_balance
+        )
+    except ValueError as e:
+        bad_request(str(e))
+
     insert_account(account)
     return account
-
-        
+       
 
 # -------------------------
 # Deposit (Idempotent)
@@ -96,13 +100,17 @@ def deposit_money(
     authorize(role, "deposit")
 
     if idempotency_exists(payload.idempotency_key):
-        raise HTTPException(status_code=409, detail="Duplicate request detected")
+        conflict("Duplicate request detected")
 
     account = get_account(account_id)
     if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
+        not_found("Account")
 
-    account = deposit_service(account, payload.amount)
+    try:
+        account = deposit_service(account, payload.amount)
+    except ValueError as e:
+        bad_request(str(e))
+
     update_balance(account_id, account["balance"])
     insert_transaction_log(
         account_id,
@@ -111,6 +119,7 @@ def deposit_money(
         account["balance"]
     )
     store_idempotency_key(payload.idempotency_key, account_id, "DEPOSIT")
+
 
     return account
 
@@ -128,9 +137,13 @@ def withdraw_money(
 
     account = get_account(account_id)
     if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
+        not_found("Account")
 
-    account = withdraw_service(account, payload.amount)
+    try:
+        account = withdraw_service(account, payload.amount)
+    except ValueError as e:
+        bad_request(str(e))
+
     update_balance(account_id, account["balance"])
     insert_transaction_log(
         account_id,
