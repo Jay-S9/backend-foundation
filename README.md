@@ -34,6 +34,14 @@ core financial-system engineering principles.
 - `models/` — request & error contracts
 - `database.py` — persistence setup
 
+## Safety Invariants
+
+- Authorization is enforced before state mutation
+- Deposits are idempotent to protect against retries
+- Withdrawals require elevated permissions
+- All successful mutations are audit-logged
+- Errors follow a consistent, machine-readable contract
+
 ## Notes
 
 The database file is intentionally excluded from version control.
