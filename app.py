@@ -32,17 +32,32 @@ app = FastAPI()
 # -------------------------
 # API Key Authentication
 # -------------------------
-VALID_API_KEYS = {
-    "internal-service-key-123",
-    "admin-key-456"
+API_KEY_ROLES = {
+    "internal-service-key-123": "service",
+    "admin-key-456": "admin"
 }
 
 api_key_header = APIKeyHeader(name="x-api-key", auto_error=False)
 
-def authenticate(api_key: str = Security(api_key_header)):
-    if not api_key or api_key not in VALID_API_KEYS:
+def authenticate(api_key: str):
+    role = API_KEY_ROLES.get(api_key)
+    if not role:
         raise HTTPException(status_code=401, detail="Unauthorized")
+    return role
 
+def authorize(role: str, action: str):
+    permissions = {
+        "service": {"deposit"},
+        "admin": {"deposit", "withdraw"}
+    }
+
+    allowed_actions = permissions.get(role, set())
+
+    if action not in allowed_actions:
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden: insufficient permissions"
+        )
 
 @app.on_event("startup")
 def startup():
@@ -65,6 +80,7 @@ def create_new_account(
     )
     insert_account(account)
     return account
+
         
 
 # -------------------------
@@ -76,7 +92,8 @@ def deposit_money(
     payload: DepositRequest,
     api_key: str = Security(api_key_header)
 ):
-    authenticate(api_key)
+    role = authenticate(api_key)
+    authorize(role, "deposit")
 
     if idempotency_exists(payload.idempotency_key):
         raise HTTPException(status_code=409, detail="Duplicate request detected")
@@ -94,8 +111,8 @@ def deposit_money(
         account["balance"]
     )
     store_idempotency_key(payload.idempotency_key, account_id, "DEPOSIT")
-    return account
 
+    return account
 
 # -------------------------
 # Withdraw
@@ -106,7 +123,8 @@ def withdraw_money(
     payload: WithdrawRequest,
     api_key: str = Security(api_key_header)
 ):
-    authenticate(api_key)
+    role = authenticate(api_key)
+    authorize(role, "withdraw")
 
     account = get_account(account_id)
     if not account:
@@ -120,4 +138,5 @@ def withdraw_money(
         payload.amount,
         account["balance"]
     )
+
     return account
