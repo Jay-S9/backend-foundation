@@ -58,3 +58,8 @@ def init_idempotency():
 
     conn.commit()
     conn.close()
+
+def get_transaction_connection():
+    conn = sqlite3.connect("accounts.db")
+    conn.execute("BEGIN")
+    return conn

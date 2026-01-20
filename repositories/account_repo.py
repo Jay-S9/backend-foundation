@@ -104,3 +104,33 @@ def update_state(account_id: str, state: str):
 
     conn.commit()
     conn.close()
+
+def apply_deposit_transaction(
+    conn,
+    account_id: str,
+    amount: float,
+    new_balance: float,
+    idempotency_key: str
+):
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "UPDATE accounts SET balance = ? WHERE account_id = ?",
+        (new_balance, account_id)
+    )
+
+    cursor.execute(
+        """
+        INSERT INTO transaction_logs (account_id, action, amount, balance_after)
+        VALUES (?, 'DEPOSIT', ?, ?)
+        """,
+        (account_id, amount, new_balance)
+    )
+
+    cursor.execute(
+        """
+        INSERT INTO idempotency_keys (key, account_id, action)
+        VALUES (?, ?, 'DEPOSIT')
+        """,
+        (idempotency_key, account_id)
+    )

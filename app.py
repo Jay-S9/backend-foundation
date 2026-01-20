@@ -3,6 +3,8 @@ from models.account_state import AccountState
 from fastapi.security import APIKeyHeader
 from services.account_state_service import transition_account_state
 from repositories.account_repo import update_state
+from database import get_transaction_connection
+from repositories.account_repo import apply_deposit_transaction
 from fastapi import Security
 from models.errors import (
     unauthorized,
@@ -109,22 +111,28 @@ def deposit_money(
     if not account:
         not_found("Account")
 
+    conn = get_transaction_connection()
+
     try:
-        account = deposit_service(account, payload.amount)
-    except ValueError as e:
-        bad_request(str(e))
+        updated_account = deposit_service(account, payload.amount)
 
-    update_balance(account_id, account["balance"])
-    insert_transaction_log(
-        account_id,
-        "DEPOSIT",
-        payload.amount,
-        account["balance"]
-    )
-    store_idempotency_key(payload.idempotency_key, account_id, "DEPOSIT")
+        apply_deposit_transaction(
+            conn,
+            account_id,
+            payload.amount,
+            updated_account["balance"],
+            payload.idempotency_key
+        )
 
+        conn.commit()
+        return updated_account
 
-    return account
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
 
 # -------------------------
 # Withdraw
