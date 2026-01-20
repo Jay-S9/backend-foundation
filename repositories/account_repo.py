@@ -6,8 +6,8 @@ def insert_account(account: dict):
     cursor = conn.cursor()
 
     cursor.execute(
-        "INSERT INTO accounts (account_id, balance, status) VALUES (?, ?, ?)",
-        (account["account_id"], account["balance"], account["status"])
+        "INSERT INTO accounts (account_id, balance, state) VALUES (?, ?, ?)",
+        (account["account_id"], account["balance"], account["state"])
     )
 
     conn.commit()
@@ -19,7 +19,7 @@ def get_account(account_id: str):
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT account_id, balance, status FROM accounts WHERE account_id = ?",
+        "SELECT account_id, balance, state FROM accounts WHERE account_id = ?",
         (account_id,)
     )
     row = cursor.fetchone()
@@ -31,7 +31,7 @@ def get_account(account_id: str):
     return {
         "account_id": row[0],
         "balance": row[1],
-        "status": row[2]
+        "state": row[2]
     }
 
 
@@ -88,6 +88,18 @@ def store_idempotency_key(key: str, account_id: str, action: str):
         VALUES (?, ?, ?)
         """,
         (key, account_id, action)
+    )
+
+    conn.commit()
+    conn.close()
+
+def update_state(account_id: str, state: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "UPDATE accounts SET state = ? WHERE account_id = ?",
+        (state, account_id)
     )
 
     conn.commit()

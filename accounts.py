@@ -1,3 +1,5 @@
+from models.account_state import AccountState
+
 def create_account(account_id: str, initial_balance: float):
     if not account_id:
         raise ValueError("Account ID cannot be empty")
@@ -8,9 +10,8 @@ def create_account(account_id: str, initial_balance: float):
     return {
         "account_id": account_id,
         "balance": initial_balance,
-        "status": "active"
+        "state": AccountState.ACTIVE.value
     }
-
 
 def deposit(account: dict, amount: float):
     if amount <= 0:

@@ -12,11 +12,11 @@ def init_db():
     cursor = conn.cursor()
 
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS accounts (
-            account_id TEXT PRIMARY KEY,
-            balance REAL NOT NULL,
-            status TEXT NOT NULL
-        )
+    CREATE TABLE IF NOT EXISTS accounts (
+        account_id TEXT PRIMARY KEY,
+        balance REAL NOT NULL,
+        state TEXT NOT NULL
+    )
     """)
 
     conn.commit()

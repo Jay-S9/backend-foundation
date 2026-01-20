@@ -1,5 +1,8 @@
 from fastapi import FastAPI
+from models.account_state import AccountState
 from fastapi.security import APIKeyHeader
+from services.account_state_service import transition_account_state
+from repositories.account_repo import update_state
 from fastapi import Security
 from models.errors import (
     unauthorized,
@@ -152,4 +155,50 @@ def withdraw_money(
         account["balance"]
     )
 
+    return account
+
+@app.post("/accounts/{account_id}/freeze")
+def freeze_account(
+    account_id: str,
+    api_key: str = Security(api_key_header)
+):
+    role = authenticate(api_key)
+    authorize(role, "withdraw")  # admin-only
+
+    account = get_account(account_id)
+    if not account:
+        not_found("Account")
+
+    try:
+        account = transition_account_state(
+            account,
+            AccountState.FROZEN.value
+        )
+    except ValueError as e:
+        bad_request(str(e))
+
+    update_state(account_id, account["state"])
+    return account
+
+@app.post("/accounts/{account_id}/unfreeze")
+def unfreeze_account(
+    account_id: str,
+    api_key: str = Security(api_key_header)
+):
+    role = authenticate(api_key)
+    authorize(role, "withdraw")  # admin-only
+
+    account = get_account(account_id)
+    if not account:
+        not_found("Account")
+
+    try:
+        account = transition_account_state(
+            account,
+            AccountState.ACTIVE.value
+        )
+    except ValueError as e:
+        bad_request(str(e))
+
+    update_state(account_id, account["state"])
     return account
